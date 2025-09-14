@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sales Funnel Analysis</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <style>
+    :root{
+      --bg:#ffffff; --text:#0f172a; --muted:#64748b; --border:#e2e8f0;
+      --green:#16a34a; --green-bg:#dcfce7;
+      --yellow:#ca8a04; --yellow-bg:#fef9c3;
+      --red:#dc2626; --red-bg:#fee2e2;
+      --panel:#ffffff; --panel-2:#f8fafc;
+      --blue:#1e40af; --blue-bg:#dbeafe;
+      --orange:#9a3412; --orange-bg:#ffedd5;
+      --gray:#334155; --gray-bg:#e2e8f0;
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .container{max-width:1280px;margin:0 auto;padding:24px}
+    h1{font-size:24px;margin:0 0 6px}
+    h2{font-size:18px;margin:0 0 8px}
+    p{margin:0 0 12px;color:var(--muted)}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{border:1px solid var(--border);background:#0f172a;color:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.secondary{background:transparent;color:var(--text)}
+    button.small{padding:4px 8px;font-size:12px;border-radius:8px}
+    button:hover{opacity:.9}
+    .card{border:1px solid var(--border);border-radius:14px;padding:14px;background:var(--panel)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--border);font-size:14px;vertical-align:middle}
+    th{color:var(--muted);background:var(--panel-2);text-align:left}
+    td.right, th.right{text-align:right}
+    input[type=number], input[type=text], textarea, select{padding:8px;border:1px solid var(--border);border-radius:10px;font-size:14px}
+    input[type=number]{width:120px;text-align:right}
+    input[type=text]{width:160px}
+    select{min-width:140px}
+    textarea{width:100%;min-height:90px;resize:vertical}
+    .kpi{border:1px solid var(--border);border-radius:12px;padding:8px 10px;display:inline-flex;gap:8px;align-items:center}
+    .pill{display:inline-block;border-radius:999px;border:1px solid; padding:4px 8px;font-size:12px}
+    .ok{color:var(--green);background:var(--green-bg);border-color:#86efac}
+    .warn{color:var(--yellow);background:var(--yellow-bg);border-color:#fde68a}
+    .bad{color:var(--red);background:var(--red-bg);border-color:#fca5a5}
+    .grid{display:grid;gap:12px}
+    .grid-2{grid-template-columns:1fr 1fr}
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+    .bar-row{display:grid;grid-template-columns:1fr 60px;gap:8px;align-items:center;margin:6px 0}
+    .bar-wrap{height:10px;background:#f1f5f9;border-radius:999px;overflow:hidden}
+    .bar{height:10px;background:#0f172a}
+    /* Client status badge colors */
+    .status-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid transparent}
+    .status-new{color:#065f46;background:#d1fae5;border-color:#6ee7b7}           /* green-ish */
+    .status-probation{color:var(--blue);background:var(--blue-bg);border-color:#93c5fd}
+    .status-returned{color:var(--orange);background:var(--orange-bg);border-color:#fdba74}
+    .status-cancelled{color:var(--gray);background:var(--gray-bg);border-color:#cbd5e1}
+    /* Scroll area for clients section body */
+    .clients-scroll{max-height:260px; overflow-y:auto; border:1px dashed var(--border); border-radius:12px; padding:6px; background:#fff}
+    @media (max-width:992px){.grid-2{grid-template-columns:1fr}}
+  
+    /* Funnel adjustments */
+    #funnelBars .bar-row{grid-template-columns: 100px 1fr 40px; gap:4px;}
+    #funnelPcts .kpi{gap:4px; padding:4px 6px;}
+    #funnelPcts strong{margin-left:4px;}
+
+  
+    /* Funnel rows show inline % badges next to the count */
+    #funnelBars .bar-row{grid-template-columns: 110px 1fr max-content max-content; gap:6px; align-items:center;}
+    #funnelBars .pct-badge{display:inline-block;border-radius:999px;border:1px solid #e2e8f0;padding:2px 6px;font-size:12px;color:#0f172a;}
+    #funnelBars .pct-badge.ok{color:#16a34a;background:#dcfce7;border-color:#86efac}
+    #funnelBars .pct-badge.warn{color:#ca8a04;background:#fef9c3;border-color:#fde68a}
+    #funnelBars .pct-badge.bad{color:#dc2626;background:#fee2e2;border-color:#fca5a5}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <div class="row" style="align-items:center;gap:10px"><img src="logo.png" alt="logo" style="height:64px"><h1>Sales Funnel Analysis</h1></div>
+        <p>Amounts first, then % relative to the previous stage. Global targets apply to all months.</p>
+      </div>
+      <div class="row">
+        <button id="addMonth">Add Month</button>
+        <button id="resetSample" class="secondary">Reset sample</button>
+        <button id="exportJSON" class="secondary">Export JSON</button>
+      </div>
+    </div>
+
+    <!-- Targets -->
+    <div class="card" style="margin-top:12px">
+      <h2>Targets (apply to all months)</h2>
+      <div class="row" style="gap:16px;flex-wrap:wrap">
+        <div class="row" style="gap:8px">
+          <div class="small muted" style="width:220px">Monthly Calls Target (amount)</div>
+          <input type="number" id="t-calls" value="2000" min="0" style="width:140px">
+        </div>
+        <div class="row" style="gap:8px">
+          <div class="small muted" style="width:220px">Bookings % of Calls</div>
+          <input type="number" id="t-c2b" value="2" min="0" style="width:120px"><span class="muted small">%</span>
+        </div>
+        <div class="row" style="gap:8px">
+          <div class="small muted" style="width:220px">Shows % of Bookings</div>
+          <input type="number" id="t-b2s" value="40" min="0" style="width:120px"><span class="muted small">%</span>
+        </div>
+        <div class="row" style="gap:8px">
+          <div class="small muted" style="width:220px">Closings % of Shows</div>
+          <input type="number" id="t-s2c" value="25" min="0" style="width:120px"><span class="muted small">%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main grid: Left scenarios + Right clients -->
+    <div class="grid grid-2" style="margin-top:12px">
+      <!-- LEFT: Scenarios -->
+      <div class="card">
+        <h2>Scenarios (This Month)</h2>
+        <p class="small muted">Best case assumes each client yields the <b>New Added</b> rate per seat. Worst case = <b>25%</b> of all <b>New Added</b> + <b>Probation Passed</b> seats.</p>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div id="bestCase" class="kpi"><span class="small muted">Best Case</span> <strong id="bestMoney">$0</strong></div>
+          <div id="worstCase" class="kpi"><span class="small muted">Worst Case</span> <strong id="worstMoney">$0</strong></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Clients & salary -->
+      <div class="card">
+        <h2>Clients & Salary (This Month)</h2>
+        <p class="small muted">Rates: <span class="status-badge status-new">New added = $100/seat</span> · <span class="status-badge status-probation">Probation passed = $50/seat</span> · <span class="status-badge status-returned">Returned = $0</span> · <span class="status-badge status-cancelled">Cancelled = $0</span></p>
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+          <button id="addClient" class="small">Add Client</button>
+          <div class="small muted">Base salary: <b>$145</b></div>
+        </div>
+        <table style="margin-bottom:8px">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Status</th>
+              <th class="right">Seats</th>
+              <th class="right">Rate/Seat</th>
+              <th class="right">Revenue</th>
+              <th></th>
+            </tr>
+          </thead>
+        </table>
+        <div class="clients-scroll">
+          <table>
+            <tbody id="clientsBody"></tbody>
+          </table>
+        </div>
+        <table style="margin-top:8px">
+          <tfoot>
+            <tr>
+              <th colspan="4" class="right">Commission (sum)</th>
+              <th class="right" id="commissionSum">$0</th>
+              <th></th>
+            </tr>
+            <tr>
+              <th colspan="4" class="right">Projected Salary</th>
+              <th class="right" id="projectedSalary">$145</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Monthly table -->
+    <div class="card" style="margin-top:12px">
+      <h2>Monthly Performance</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="right">Calls <span class="small muted">(vs target)</span></th>
+            <th class="right">Bookings</th>
+            <th class="right">Bookings % of Calls</th>
+            <th class="right">Shows</th>
+            <th class="right">Shows % of Bookings</th>
+            <th class="right">Closings</th>
+            <th class="right">Closings % of Shows</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="monthsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Funnel (select month) with notes and calls target display -->
+    <div class="card" style="margin-top:12px">
+      <h2>Funnel (select month)</h2>
+      <select id="monthSelect"></select>
+      <div id="funnelBars" style="margin-top:12px"></div>
+      <div class="row" style="gap:12px;align-items:center;margin:8px 0">
+        <div id="funnelPcts" class="row" style="gap:12px;flex-wrap:wrap"></div>
+      </div>
+      <div class="row" style="gap:12px;align-items:center;margin:8px 0">
+        <div class="small muted">Monthly Calls Target:</div>
+        <div id="callsTargetBadge" class="kpi"><span class="small muted">Target</span> <strong id="callsTargetLabel">0</strong> <span class="pill" id="callsAchPill">0%</span></div>
+      </div>
+      <div style="margin-top:8px">
+        <label class="small muted">Month Notes / Updates</label>
+        <textarea id="monthNotes" placeholder="Write updates you did this month..."></textarea>
+      </div>
+    </div>
+
+    <!-- Hourly tasks -->
+    <div class="card" style="margin-top:12px">
+      <h2>Hourly Tasks (9 hours)</h2>
+      <p class="small muted">Plan one workday: target calls and lead-management notes each hour. Track actual calls with the +/- or type the number. You can add today's total to the selected month's Calls.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Hour</th>
+            <th class="right">Target Calls</th>
+            <th class="right">Actual Calls (counter)</th>
+            <th>Lead Management (notes/tasks)</th>
+          </tr>
+        </thead>
+        <tbody id="hoursBody"></tbody>
+        <tfoot>
+          <tr>
+            <th>Total</th>
+            <th class="right" id="targetTotal">0</th>
+            <th class="right" id="actualTotal">0</th>
+            <th></th>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="row" style="justify-content:flex-end;margin-top:10px">
+        <label class="small muted"><input type="checkbox" id="resetAfterAdd" checked> Reset hourly actuals after adding</label>
+        <button id="addToMonth">Add today's Actual Calls to selected month</button>
+      </div>
+    <footer style="text-align:center;color:#64748b;font-size:12px;margin-top:16px">created by Suhyl Sami, Head of Sales department</footer>
+
+    <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:16px">
+      Single-file app — open locally in any modern browser.
+    </p>
+  </div>
+
+<script>
+(function(){
+  const $ = (s, el=document) => el.querySelector(s);
+  const rnd = () => Math.random().toString(36).slice(2,10);
+
+  // ------ Data ------
+  let months = [
+    { id:rnd(), name:"July",      calls:5000, bookings:100, shows:27, closings:4, notes:"" },
+    { id:rnd(), name:"August",    calls:2630, bookings:84,  shows:16, closings:4, notes:"" },
+    { id:rnd(), name:"September", calls:1000, bookings:29,  shows:14, closings:0, notes:"" },
+  ];
+  let hours = Array.from({length:9}, (_,i)=>({ hour:i+1, target:25, actual:0, notes:"" }));
+
+  // Example client list (start empty)
+  let clients = [];
+
+  const targets = {
+    get calls(){ return Number($("#t-calls").value)||0 },
+    get c2b(){ return Number($("#t-c2b").value)||0 },
+    get b2s(){ return Number($("#t-b2s").value)||0 },
+    get s2c(){ return Number($("#t-s2c").value)||0 },
+  };
+
+  const STATUS_RATES = {
+    "new added": 100,
+    "probation passed": 50,
+    "returned": 0,
+    "cancelled": 0,
+  };
+
+  // ------ Helpers ------
+  function pct(n,d){ return (!d||d<=0)?0:(n/d*100); }
+  function tone(val, target){
+    if (val >= target) return "ok";
+    if (val >= target*0.75) return "warn";
+    return "bad";
+  }
+  function numInput(value, onInput, width, step){
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min = "0"; inp.value = value;
+    if(width) inp.style.width = width;
+    if(step) inp.step = step;
+    inp.addEventListener("input", ()=> onInput(Math.max(0, Number(inp.value)||0)));
+    return inp;
+  }
+  function textInput(value, onInput, width){
+    const inp = document.createElement("input");
+    inp.type = "text"; inp.value=value;
+    if(width) inp.style.width = width;
+    inp.addEventListener("input", ()=> onInput(inp.value));
+    return inp;
+  }
+  function selectInput(value, options, onChange){
+    const sel = document.createElement("select");
+    options.forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt; o.textContent = opt[0].toUpperCase()+opt.slice(1);
+      sel.appendChild(o);
+    });
+    sel.value = value;
+    sel.addEventListener("change", ()=> onChange(sel.value));
+    return sel;
+  }
+  function pill(text, cls){
+    const span = document.createElement("span");
+    span.className = "pill " + cls;
+    span.textContent = text;
+    return span;
+  }
+  function bar(label, value, max, pctValue, pctClass){
+    const wrap = document.createElement("div");
+    wrap.className = "bar-row";
+    const left = document.createElement("div"); left.textContent=label; left.className="muted small"; wrap.appendChild(left);
+    const right = document.createElement("div");
+    const bw = document.createElement("div"); bw.className="bar-wrap";
+    const b  = document.createElement("div"); b.className="bar"; b.style.width=Math.max(0,Math.min(100,(value/max*100)))+"%";
+    bw.appendChild(b); right.appendChild(bw); wrap.appendChild(right);
+    const cnt = document.createElement("div"); cnt.textContent=value; cnt.style.textAlign="right"; cnt.className="small"; wrap.appendChild(cnt);
+    const pct = document.createElement("div"); pct.className = "pct-badge " + (pctClass||""); pct.textContent = (pctValue!=null? pctValue.toFixed(1) : 0) + "%";
+    wrap.appendChild(pct);
+    return wrap;
+  }
+  function statusBadge(status){
+    const span = document.createElement("span");
+    span.className = "status-badge " + (
+      status==="new added" ? "status-new" :
+      status==="probation passed" ? "status-probation" :
+      status==="returned" ? "status-returned" :
+      "status-cancelled"
+    );
+    span.textContent = status[0].toUpperCase()+status.slice(1);
+    return span;
+  }
+
+  // ------ Monthly table ------
+  const monthsBody = $("#monthsBody");
+  const monthSelect = $("#monthSelect");
+  const funnelBars = $("#funnelBars");
+  const funnelPcts = $("#funnelPcts");
+  const monthNotes = $("#monthNotes");
+  const callsTargetLabel = $("#callsTargetLabel");
+  const callsAchPill = $("#callsAchPill");
+
+  function renderMonths(){
+    monthsBody.innerHTML = "";
+    months.forEach(m=>{
+      const tr = document.createElement("tr");
+      let td;
+
+      td = document.createElement("td");
+      const nameInput = textInput(m.name, v=>{ m.name=v; renderSelect(); });
+      td.appendChild(nameInput); tr.appendChild(td);
+
+      // Calls + target pill
+      td = document.createElement("td"); td.className="right";
+      const callsInput = numInput(m.calls, v=>{ m.calls=v; sync(); });
+      td.appendChild(callsInput);
+      const targetCalls = targets.calls;
+      const ach = targetCalls>0 ? pct(m.calls, targetCalls) : 0;
+      const callsPill = pill((ach.toFixed(0)||0) + "%", tone(ach, 100));
+      callsPill.style.marginLeft = "8px";
+      td.appendChild(callsPill);
+      tr.appendChild(td);
+
+      // Bookings
+      td = document.createElement("td"); td.className="right";
+      td.appendChild(numInput(m.bookings, v=>{ m.bookings=v; sync(); })); tr.appendChild(td);
+
+      // Bookings % of Calls
+      td = document.createElement("td"); td.className="right";
+      const c2b = pct(m.bookings, m.calls);
+      td.appendChild(pill(c2b.toFixed(1) + "%", tone(c2b, targets.c2b))); tr.appendChild(td);
+
+      // Shows
+      td = document.createElement("td"); td.className="right";
+      td.appendChild(numInput(m.shows, v=>{ m.shows=v; sync(); })); tr.appendChild(td);
+
+      // Shows % of Bookings
+      td = document.createElement("td"); td.className="right";
+      const b2s = pct(m.shows, m.bookings);
+      td.appendChild(pill(b2s.toFixed(1) + "%", tone(b2s, targets.b2s))); tr.appendChild(td);
+
+      // Closings
+      td = document.createElement("td"); td.className="right";
+      td.appendChild(numInput(m.closings, v=>{ m.closings=v; sync(); })); tr.appendChild(td);
+
+      // Closings % of Shows
+      td = document.createElement("td"); td.className="right";
+      const s2c = pct(m.closings, m.shows);
+      td.appendChild(pill(s2c.toFixed(1) + "%", tone(s2c, targets.s2c))); tr.appendChild(td);
+
+      // Remove
+      td = document.createElement("td");
+      const rm = document.createElement("button"); rm.textContent="Remove"; rm.className="secondary small";
+      rm.addEventListener("click", ()=>{ months = months.filter(x=>x.id!==m.id); sync(); });
+      td.appendChild(rm); tr.appendChild(td);
+
+      monthsBody.appendChild(tr);
+    });
+  }
+
+  // Select + notes + funnel + calls target badge
+  function renderSelect(){
+    const prev = monthSelect.value;
+    monthSelect.innerHTML = "";
+    months.forEach(m=>{
+      const o=document.createElement("option"); o.value=m.id; o.textContent=m.name; monthSelect.appendChild(o);
+    });
+    if(prev && months.some(m=>m.id===prev)) monthSelect.value = prev;
+    else if(months[0]) monthSelect.value = months[0].id;
+    renderFunnel();
+  }
+
+  
+  function renderFunnel(){
+    const id = monthSelect.value || (months[0] && months[0].id);
+    const m = months.find(x=>x.id===id) || months[0];
+    funnelBars.innerHTML=""; funnelPcts.innerHTML=""; 
+    if(!m) { monthNotes.value=""; return; }
+    const max = Math.max(1, m.calls);
+    const targetCalls = targets.calls;
+    const callsPct = targetCalls>0 ? (m.calls/targetCalls*100) : 0;
+    const c2b = (m.calls>0) ? (m.bookings/m.calls*100) : 0;
+    const b2s = (m.bookings>0) ? (m.shows/m.bookings*100) : 0;
+    const s2c = (m.shows>0) ? (m.closings/m.shows*100) : 0;
+
+    function toneClass(val, target){
+      if (val >= target) return "ok";
+      if (val >= target*0.75) return "warn";
+      return "bad";
+    }
+
+    funnelBars.appendChild(bar("Calls", m.calls, max, callsPct, toneClass(callsPct, 100)));
+    funnelBars.appendChild(bar("Bookings", m.bookings, max, c2b, toneClass(c2b, targets.c2b)));
+    funnelBars.appendChild(bar("Shows", m.shows, max, b2s, toneClass(b2s, targets.b2s)));
+    funnelBars.appendChild(bar("Closings", m.closings, max, s2c, toneClass(s2c, targets.s2c)));
+
+    // compact KPI pills below remain for quick glance
+    [["Bookings % of Calls",c2b,targets.c2b],["Shows % of Bookings",b2s,targets.b2s],["Closings % of Shows",s2c,targets.s2c]].forEach(([label,val,t])=>{
+      const div=document.createElement("div"); div.className="kpi "+toneClass(val,t);
+      div.innerHTML=`<span class="small muted">${label}</span><strong>${val.toFixed(1)}%</strong>`;
+      funnelPcts.appendChild(div);
+    });
+
+    // calls target display
+    const ach = callsPct;
+    $("#callsTargetLabel").textContent = String(targetCalls||0);
+    const pillEl = $("#callsAchPill");
+    pillEl.textContent = ach.toFixed(0) + "%";
+    pillEl.className = "pill " + (ach>=100 ? "ok" : (ach>=75 ? "warn" : "bad"));
+
+    // notes
+    monthNotes.value = m.notes || "";
+  }
+  monthSelect.addEventListener("change", renderFunnel)
+("change", renderFunnel);
+  monthNotes.addEventListener("input", ()=>{
+    const id = monthSelect.value;
+    const m = months.find(x=>x.id===id);
+    if(m){ m.notes = monthNotes.value; }
+  });
+
+  // ------ Hourly tasks ------
+  const hoursBody = $("#hoursBody");
+  const targetTotal = $("#targetTotal");
+  const actualTotal = $("#actualTotal");
+  const addToMonthBtn = $("#addToMonth");
+  const resetAfterAdd = $("#resetAfterAdd");
+
+  function renderHours(){
+    hoursBody.innerHTML="";
+    let sumTarget=0, sumActual=0;
+    hours.forEach(h=>{
+      const tr=document.createElement("tr");
+      let td=document.createElement("td"); td.textContent = `Hour ${h.hour}`; tr.appendChild(td);
+
+      // target
+      td=document.createElement("td"); td.className="right"; 
+      const ipTarget=numInput(h.target, v=>{ h.target=v; renderHours();}, "120px"); td.appendChild(ipTarget); tr.appendChild(td);
+
+      // actual with counter
+      td=document.createElement("td"); td.className="right"; 
+      const wrap=document.createElement("div"); wrap.style.display="inline-flex"; wrap.style.gap="6px"; wrap.style.alignItems="center";
+      const minus=document.createElement("button"); minus.textContent="−"; minus.className="secondary small";
+      const ipActual=numInput(h.actual, v=>{ h.actual=v; renderHours();}, "90px");
+      const plus=document.createElement("button"); plus.textContent="+"; plus.className="secondary small";
+      minus.addEventListener("click", ()=>{ h.actual=Math.max(0,h.actual-1); renderHours(); });
+      plus.addEventListener("click", ()=>{ h.actual=h.actual+1; renderHours(); });
+      wrap.appendChild(minus); wrap.appendChild(ipActual); wrap.appendChild(plus);
+      td.appendChild(wrap); tr.appendChild(td);
+
+      // notes
+      td=document.createElement("td"); 
+      const note=textInput(h.notes, v=>{ h.notes=v;}, "100%"); td.appendChild(note); tr.appendChild(td);
+
+      hoursBody.appendChild(tr);
+      sumTarget+=h.target; sumActual+=h.actual;
+    });
+    targetTotal.textContent = sumTarget;
+    actualTotal.textContent = sumActual;
+  }
+
+  addToMonthBtn.addEventListener("click", ()=>{
+    const id = monthSelect.value || (months[0] && months[0].id);
+    const m = months.find(x=>x.id===id);
+    if(!m) return;
+    const add = hours.reduce((s,h)=>s+h.actual,0);
+    m.calls = Math.max(0, (Number(m.calls)||0) + add);
+    if(resetAfterAdd.checked){ hours.forEach(h=>h.actual=0); }
+    sync();
+  });
+
+  // ------ Clients & Salary ------
+  const clientsBody = $("#clientsBody");
+  const commissionSumEl = $("#commissionSum");
+  const projectedSalaryEl = $("#projectedSalary");
+  const bestMoneyEl = $("#bestMoney");
+  const worstMoneyEl = $("#worstMoney");
+
+  function rateForStatus(status){ return STATUS_RATES[status] ?? 0; }
+
+  function renderClients(){
+    clientsBody.innerHTML = "";
+    let commission = 0;
+    clients.forEach(c => {
+      const tr=document.createElement("tr");
+
+      // Name
+      let td=document.createElement("td"); td.appendChild(textInput(c.name, v=>{ c.name=v; })); tr.appendChild(td);
+
+      // Status with colored badge + dropdown
+      td=document.createElement("td");
+      const badgeHolder = document.createElement("div"); badgeHolder.style.display="flex"; badgeHolder.style.alignItems="center"; badgeHolder.style.gap="6px";
+      const badge = statusBadge(c.status); badgeHolder.appendChild(badge);
+      const sel = selectInput(c.status, ["new added","probation passed","returned","cancelled"], v=>{ c.status=v; syncClients(); });
+      badgeHolder.appendChild(sel);
+      td.appendChild(badgeHolder);
+      tr.appendChild(td);
+
+      // Seats (decimal, step 0.5)
+      td=document.createElement("td"); td.className="right"; td.appendChild(numInput(c.seats, v=>{ c.seats=v; syncClients(); }, null, "0.5")); tr.appendChild(td);
+
+      // Rate/seat
+      const rate = rateForStatus(c.status);
+      td=document.createElement("td"); td.className="right"; td.textContent = "$" + rate.toFixed(0); tr.appendChild(td);
+
+      // Revenue
+      const rev = rate * c.seats;
+      td=document.createElement("td"); td.className="right"; td.textContent = "$" + rev.toFixed(2); tr.appendChild(td);
+
+      // Remove
+      const tdAct=document.createElement("td"); const rm=document.createElement("button"); rm.textContent="Remove"; rm.className="secondary small"; rm.addEventListener("click", ()=>{ clients = clients.filter(x=>x!==c); syncClients(); }); tdAct.appendChild(rm); tr.appendChild(tdAct);
+
+      clientsBody.appendChild(tr);
+      commission += rev;
+    });
+    commissionSumEl.textContent = "$" + commission.toFixed(2);
+    projectedSalaryEl.textContent = "$" + (145 + commission).toFixed(2);
+
+    // Scenarios
+    const newSeats = clients.filter(c=>c.status==="new added").reduce((s,c)=>s + c.seats, 0);
+    const probationSeats = clients.filter(c=>c.status==="probation passed").reduce((s,c)=>s + c.seats, 0);
+    let base = 145;
+    if(newSeats >= 7) base += 145; // bonus
+    const best = base + (newSeats * 100) + (probationSeats * 100);
+    const worst = base + 0.25 * ((newSeats * 100) + (probationSeats * 50));
+    bestMoneyEl.textContent = "$" + best.toFixed(2);
+    worstMoneyEl.textContent = "$" + worst.toFixed(2);
+  }
+
+  $("#addClient").addEventListener("click", ()=>{
+    clients.push({ name:"Client " + (clients.length+1), status:"new added", seats:1 });
+    syncClients();
+  });
+
+  function syncClients(){ renderClients(); }
+
+  // ------ Export & Controls ------
+  $("#addMonth").addEventListener("click", ()=>{ months.push({id:rnd(), name:`Month ${months.length+1}`, calls:0, bookings:0, shows:0, closings:0, notes:""}); sync(); });
+  $("#resetSample").addEventListener("click", ()=>{
+    months = [
+      { id:rnd(), name:"July", calls:5000, bookings:100, shows:27, closings:4, notes:"" },
+      { id:rnd(), name:"August", calls:2630, bookings:84, shows:16, closings:4, notes:"" },
+      { id:rnd(), name:"September", calls:1000, bookings:29, shows:14, closings:0, notes:"" },
+    ];
+    hours = Array.from({length:9}, (_,i)=>({ hour:i+1, target:25, actual:0, notes:"" }));
+    clients = [];
+    sync();
+  });
+  $("#exportJSON").addEventListener("click", ()=>{
+    const data = JSON.stringify({ months, hours, clients, targets:{ calls:targets.calls, c2b:targets.c2b, b2s:targets.b2s, s2c:targets.s2c } }, null, 2);
+    const url = URL.createObjectURL(new Blob([data],{type:"application/json"}));
+    const a = document.createElement("a"); a.href=url; a.download="sales-analysis-data.json"; a.click(); URL.revokeObjectURL(url);
+  });
+  ["#t-calls","#t-c2b","#t-b2s","#t-s2c"].forEach(sel=> $(sel).addEventListener("input", ()=>{ sync(); }));
+
+  // ------ Sync ------
+  function sync(){ renderMonths(); renderSelect(); renderFunnel(); renderHours(); syncClients(); }
+  sync();
+})();</script>
+</body>
+</html>
